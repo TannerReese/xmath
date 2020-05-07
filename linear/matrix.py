@@ -43,6 +43,17 @@ class Matrix:
 	
 	
 	
+	def __getitem__(self, key):
+		return self.rows[key[0]][key[1]]
+	
+	def row(self, key):
+		return vector.Vector(*self.rows[key])
+	
+	def column(self, key):
+		return vector.Vector(*(r[key] for r in self.rows))
+	
+	
+	
 	def __add__(self, other):
 		if not isinstance(other, Matrix):
 			raise TypeError("Matrix can only be added to another Matrix")
@@ -179,11 +190,19 @@ class Matrix:
 		rowgen = ('(' + ', '.join(map(str, row)) + ')' for row in self.rows)
 		return 'Matrix(' + ', '.join(rowgen) + ')'
 	
+	def __str__(self):
+		return '\n'.join('[' + ', '.join(map(str, row)) + ']' for row in self.rows)
+	
 	
 	
 	def transpose(self):
 		rows, cols = self.shape
 		return Matrix(*(tuple(self.rows[r][c] for r in range(rows)) for c in range(cols)))
+	
+	def rref(self):
+		aug = AugmentedMatrix(self)
+		aug.reduce(0)
+		return aug[0]
 	
 	def inverse(self):
 		rs, cs = self.shape
@@ -215,8 +234,14 @@ class Matrix:
 		basis = []
 		for c in range(cs):
 			if c not in pivots:
-				aug[0][]
-				basis.append()
+				comps = [0] * cs
+				freeVec = aug[0].column(c)
+				
+				for r in range(len(pivots)):
+					comps[pivots[r]] = freeVec[r]
+				
+				comps[c] = -1
+				basis.append(vector.Vector(*comps))
 		return basis
 
 
@@ -298,7 +323,7 @@ class AugmentedMatrix:
 				
 				p += 1
 			
-			if leadVal == zeroVal:
+			if p >= self.rows:
 				# Column contains no viable pivots and so is free
 				continue
 			self.scale(p, 1 / leadVal)
