@@ -34,7 +34,10 @@ class RandVar:
 	
 	
 	def __getitem__(self, key):
-		return self.probabilities[key]
+		if key in self.probabilities:
+			return self.probabilities[key]
+		else:
+			return 0
 	
 	
 	
@@ -93,13 +96,41 @@ class RandVar:
 		return self.expected(lambda x: x)
 	
 	def variance(self):
-		x2m, xm = self.expected(lambda x: x * x), self.mean
+		x2m, xm = self.expected(lambda x: x * x), self.mean()
 		return x2m - xm * xm
 	
 	def stddev(self):
 		return math.sqrt(self.variance())
 	
 	
+	
+	def median(self):
+		ordered = sorted(self.probabilities.items(), key = lambda x: x[0])
+		tot = 0
+		lastX = None
+		for x, px in ordered:
+			if 2 * tot < 1 and 1 < 2 * (tot + px):
+				return x
+			elif tot == 1 / 2:
+				return (x + lastX) / 2
+			
+			lastX, lastPx = x, px
+			tot += px
+		
+		return lastX
+	
+	
+	
+	def apply(self, func):
+		probs = {}
+		for x, px in self.probabilities.items():
+			res = func(x)
+			if res in probs:
+				probs[res] += px
+			else:
+			 	probs[res] = px
+		
+		return RandVar(probs)
 	
 	def lift(self, other, operator):
 		probs = {}
@@ -171,7 +202,7 @@ class RandVar:
 		return "RandVar({" + ', '.join(repr(x) + ": " + repr(px) for x, px in self.probabilities.items()) + "})"
 	
 	def __str__(self):
-		return self.__str__()
+		return self.__repr__()
 
 
 
