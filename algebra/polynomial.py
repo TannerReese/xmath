@@ -1,13 +1,19 @@
+from . import modulo
+
 class Polynomial:
-	def __init__(self, *coefs):
+	def __init__(self, *coefs, modulo=None):
 		self.coefficients = tuple(coefs)
+		
+		self.modulo = modulo
+		self._modCoefs()
+		
 		self.__trimmed = False
 	
 	def __eq__(self, other):
 		self._trimzeros()
 		if isinstance(other, Polynomial):
 			other._trimzeros()
-			if len(other) != len(self):
+			if len(other) != len(self) or other.modulo != self.modulo:
 				return False
 			
 			for i in range(len(self)):
@@ -15,7 +21,7 @@ class Polynomial:
 					return False
 			return True
 		else:
-			if len(self.coefficients) > 1:
+			if len(self.coefficients) > 1 or self.modulo is not None:
 				return False
 			else:
 				if len(self.coefficients) == 0:
@@ -29,14 +35,14 @@ class Polynomial:
 	
 	
 	def copy(self):
-		return Polynomial(*self.coefficients)
+		return Polynomial(*self.coefficients, modulo=self.modulo)
 	
 	@staticmethod
-	def variable():
-		return Polynomial(0, 1)
+	def variable(mod=None):
+		return Polynomial(0, 1, modulo=mod)
 	
 	@staticmethod
-	def fromroots(leading, *roots):
+	def fromroots(leading, *roots, mod=None):
 		cfs = [leading]
 		for r in roots:
 			last = cfs[0]
@@ -46,17 +52,35 @@ class Polynomial:
 				last = c
 			ncfs.append(last)
 			cfs = ncfs
-		return Polynomial(*cfs)
+		return Polynomial(*cfs, modulo=mod)
 	
 	def _trimzeros(self):
 		if self.coefficients == []:
 			return
 		
+		self._modCoefs()
+		
 		i = len(self.coefficients) - 1
 		while i >= 0 and self.coefficients[i] == 0:
 			i -= 1
-		self.coefficients = tuple(list(self.coefficients)[:i + 1])
+		self.coefficients = tuple(list(self.coefficients)[:i + 1])  # Exclude leading zeros
 		self.__trimmed = True
+	
+	def _findMod(self, other):
+		if isinstance(other, Polynomial) and other.modulo is not None:
+			if self.modulo is not None:
+				if self.modulo == other.modulo:
+					return self.modulo
+				else:
+					raise ValueError("Artihmetic between Polynomials over Modular Rings must have same modulo")
+			else:
+				return other.modulo
+		else:
+			return self.modulo
+	
+	def _modCoefs(self):
+		if self.modulo is not None:
+			self.coefficients = tuple(map(lambda x: x % self.modulo, self.coefficients))
 	
 	
 	
@@ -92,7 +116,7 @@ class Polynomial:
 	
 	
 	def __neg__(self):
-		return Polynomial(*[-c for c in self.coefficients])
+		return Polynomial(*[-c for c in self.coefficients], modulo=self.modulo)
 	
 	
 	
@@ -112,7 +136,7 @@ class Polynomial:
 			else:
 				ncfs[0] += other
 		
-		return Polynomial(*ncfs)
+		return Polynomial(*ncfs, modulo=self._findMod(other))
 	
 	def __radd__(self, other):
 		return self.__add__(other)
@@ -126,7 +150,7 @@ class Polynomial:
 				ncfs.append(-other)
 			else:
 				ncfs[0] -= other
-			return Polynomial(*ncfs)
+			return Polynomial(*ncfs, modulo=self.modulo)
 	
 	def __rsub__(self, other):
 		return self.__neg__().__add__(other)
@@ -145,7 +169,7 @@ class Polynomial:
 		else:
 			ncfs = [c * other for c in self.coefficients]
 		
-		return Polynomial(*ncfs)
+		return Polynomial(*ncfs, modulo=self._findMod(other))
 	
 	def __rmul__(self, other):
 		return self.__mul__(other)
@@ -164,7 +188,7 @@ class Polynomial:
 			other -= 1
 		
 		if prod is None:
-			prod = Polynomial(1)
+			prod = Polynomial(1, modulo=self.modulo)
 		
 		return prod
 	
@@ -174,15 +198,21 @@ class Polynomial:
 	def divmod(a, b):
 		a._trimzeros()
 		b._trimzeros()
+		mod = Polynomial._findMod(a, b)
 		
 		if a.degree < b.degree:
-			return (Polynomial(), a.copy())
+			return (Polynomial(modulo=mod), a.copy())
 		elif len(b.coefficients) == 0:
 			raise ZeroDivisionError('Polynomial divided by zero')
 		else:
 			qcfs, rcfs = [], [c for c in a.coefficients]
 			divcf = b.leading
-			divis = [c / divcf for c in b.coefficients]
+			if mod is None:
+				invDivcf = 1 / divcf
+			else:
+				invDivcf = modulo.Modulo.invert(divcf, mod)
+			
+			divis = [c * invDivcf for c in b.coefficients]
 			
 			diff = len(rcfs) - len(divis)
 			while diff >= 0:
@@ -193,20 +223,26 @@ class Polynomial:
 							rcfs[i] -= lead * divis[i - diff]
 				
 				rcfs = rcfs[:-1]
-				qcfs.insert(0, lead / divcf)
+				qcfs.insert(0, lead * invDivcf)
 				diff -= 1
 			
-			return (Polynomial(*qcfs), Polynomial(*rcfs))
+			return (Polynomial(*qcfs, modulo=mod), Polynomial(*rcfs, modulo=mod))
 	
 	def __floordiv__(self, other):
 		if not isinstance(other, Polynomial):
-			return Polynomial(*[c / other for c in self.coefficients])
+			mod = self._findMod(other)
+			if mod is None:
+				other = 1 / other
+			else:
+				other = modulo.Modulo.invert(other, mod)
+			
+			return Polynomial(*[c * other for c in self.coefficients], modulo=mod)
 		else:
 			return Polynomial.divmod(self, other)[0]
 	
 	def __mod__(self, other):
 		if not isinstance(other, Polynomial):
-			return Polynomial()
+			return Polynomial(modulo=self.modulo)
 		else:
 			return Polynomial.divmod(self, other)[1]
 	
@@ -217,6 +253,9 @@ class Polynomial:
 		for i in range(len(self) - 2, -1, -1):
 			total *= x
 			total += self.coefficients[i]
+		
+		if self.modulo is not None:
+			total %= self.modulo
 		return total
 	
 	def __str__(self):
@@ -256,8 +295,16 @@ class Polynomial:
 				
 				ss += term
 		
+		if self.modulo is not None:
+			ss += ' (mod ' + str(self.modulo) + ')'
+		
 		return ss
 	
 	def __repr__(self):
 		self._trimzeros()
-		return 'polynomial.Polynomial(' + ', '.join(map(repr, self.coefficients)) + ')'
+		modstr = ''
+		if self.modulo is not None:
+			modstr = ', modulo=' + str(self.modulo)
+		
+		return 'Polynomial(' + ', '.join(map(repr, self.coefficients)) + modstr + ')'
+
