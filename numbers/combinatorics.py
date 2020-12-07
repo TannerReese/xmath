@@ -19,6 +19,36 @@ def factorial(n, fall=None, rise=None):
 	return prod
 
 
+
+def __gcd(a, b):
+	b, a = max(a, b), min(a, b)
+	while a > 0:
+		b, a = a, b % a
+	return b
+
+def gcd(*args):
+	g = None
+	for a in args:
+		if g is None:
+			g = a
+		else:
+			g = __gcd(g, a)
+	return g
+
+def lcm(*args):
+	def __lcm(a, b):
+		return a * b // __gcd(a, b)
+	
+	m = None
+	for a in args:
+		if m is None:
+			m = a
+		else:
+			m = __lcm(m, a)
+	return m
+
+
+
 def choose(n, k):
 	c = factorial(n, fall=k) / factorial(k)
 	
