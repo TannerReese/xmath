@@ -88,6 +88,9 @@ class Ratio:
 		else:
 			return Ratio(self.num, self.den * other)
 	
+	def __truediv__(self, other):
+		return self.__div__(other)
+	
 	
 	def __radd__(self, other):
 		return self.__add__(other)
@@ -99,6 +102,9 @@ class Ratio:
 		return self.__mul__(other)
 	
 	def __rdiv__(self, other):
+		return Ratio(self.den, self.num).__mul__(other)
+	
+	def __rtruediv__(self, other):
 		return Ratio(self.den, self.num).__mul__(other)
 	
 	
