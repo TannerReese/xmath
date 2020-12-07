@@ -53,6 +53,16 @@ class Matrix:
 		return vector.Vector(*(r[key] for r in self.rows))
 	
 	
+	def map(self, func):
+		newrows = []
+		rows, cols = self.shape
+		for r in range(rows):
+			tmp = []
+			for c in range(cols):
+				tmp.append(func(self.rows[r][c]))
+			newrows.append(tmp)
+		return Matrix(*newrows)
+	
 	
 	def __add__(self, other):
 		if not isinstance(other, Matrix):
